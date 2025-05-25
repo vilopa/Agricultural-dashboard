@@ -17,8 +17,9 @@ ENV/
 instance/
 .webassets-cache
 
-# Database
+# Database - Allow agricultural_data.db but ignore other database files
 *.db
+!agricultural_data.db
 *.sqlite3
 
 # Environment variables
@@ -28,4 +29,7 @@ instance/
 .idea/
 .vscode/
 *.swp
-*.swo 
+*.swo
+
+# Windows shortcut files
+*.lnk 
