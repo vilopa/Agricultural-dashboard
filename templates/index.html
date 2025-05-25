@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agricultural Data Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Agricultural Dashboard</h2>
+        <ul>
+            <li><a href="/" class="active">Analytical Dashboard</a></li>
+            <li><a href="/strategic">Strategic Dashboard</a></li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h1>Agricultural Production Analysis</h1>
+            <p>Detailed analysis of agricultural production data</p>
+        </div>
+
+        <!-- KPI Summary -->
+        <div class="overview-container">
+            <div class="overview-card">
+                <h3>Total Records</h3>
+                <div class="value">{{ record_count }}</div>
+            </div>
+            <div class="overview-card">
+                <h3>Total Production Value</h3>
+                <div class="value">{{ total_value }}</div>
+            </div>
+        </div>
+
+        <!-- Main Charts -->
+        <div class="chart-container">
+            <div class="chart-card">
+                <h3>Production by Year</h3>
+                <canvas id="yearlyProductionChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <h3>Data Filters</h3>
+            <div class="filter-controls">
+                <div class="filter-group">
+                    <label for="indicator-filter">Indicator:</label>
+                    <select id="indicator-filter">
+                        <option value="">All Indicators</option>
+                        {% for indicator in indicators %}
+                        <option value="{{ indicator['Indicator Code'] }}">{{ indicator['Indicator'] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="area-filter">Area:</label>
+                    <select id="area-filter">
+                        <option value="">All Areas</option>
+                        {% for area in areas %}
+                        <option value="{{ area['AreaID'] }}">{{ area['Area'] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button id="apply-filters">Apply Filters</button>
+            </div>
+        </div>
+
+        <!-- Data Visualization Section -->
+        <div class="visualization-section">
+            <div class="chart-row">
+                <div class="chart-card">
+                    <h3>Top Areas by Production</h3>
+                    <canvas id="topAreasChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Indicator Distribution</h3>
+                    <canvas id="indicatorChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table Section -->
+        <div class="data-table-section">
+            <h3>Database Explorer</h3>
+            <div class="table-controls">
+                <label for="table-select">Select Table:</label>
+                <select id="table-select">
+                    <option value="">Loading tables...</option>
+                </select>
+                <button id="load-table">Load Table Data</button>
+            </div>
+            <div class="table-container">
+                <table id="data-table">
+                    <thead>
+                        <tr id="table-headers"></tr>
+                    </thead>
+                    <tbody id="table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize yearly production chart
+            const yearlyCtx = document.getElementById('yearlyProductionChart').getContext('2d');
+            const yearlyChart = new Chart(yearlyCtx, {
+                type: 'line',
+                data: {
+                    labels: {{ years|tojson }},
+                    datasets: [{
+                        label: 'Production Value',
+                        data: {{ production_values|tojson }},
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Production Value'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Year'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Load additional dashboard data from API
+            fetch('/api/dashboard_data')
+                .then(response => response.json())
+                .then(data => {
+                    // Initialize top areas chart
+                    if (data.top_areas) {
+                        const topAreasCtx = document.getElementById('topAreasChart').getContext('2d');
+                        new Chart(topAreasCtx, {
+                            type: 'bar',
+                            data: {
+                                labels: data.top_areas.labels,
+                                datasets: [{
+                                    label: 'Production Value',
+                                    data: data.top_areas.values,
+                                    backgroundColor: [
+                                        'rgba(255, 99, 132, 0.7)',
+                                        'rgba(54, 162, 235, 0.7)',
+                                        'rgba(255, 206, 86, 0.7)',
+                                        'rgba(75, 192, 192, 0.7)',
+                                        'rgba(153, 102, 255, 0.7)'
+                                    ],
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: {
+                                        position: 'top',
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    // Initialize indicators chart
+                    if (data.indicators) {
+                        const indicatorCtx = document.getElementById('indicatorChart').getContext('2d');
+                        new Chart(indicatorCtx, {
+                            type: 'pie',
+                            data: {
+                                labels: data.indicators.labels,
+                                datasets: [{
+                                    label: 'Production Value',
+                                    data: data.indicators.values,
+                                    backgroundColor: [
+                                        'rgba(255, 99, 132, 0.7)',
+                                        'rgba(54, 162, 235, 0.7)',
+                                        'rgba(255, 206, 86, 0.7)',
+                                        'rgba(75, 192, 192, 0.7)',
+                                        'rgba(153, 102, 255, 0.7)'
+                                    ],
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: {
+                                        position: 'right',
+                                    }
+                                }
+                            }
+                        });
+                    }
+                })
+                .catch(error => console.error('Error loading dashboard data:', error));
+
+            // Load database table information
+            fetch('/api/tables')
+                .then(response => response.json())
+                .then(data => {
+                    const tableSelect = document.getElementById('table-select');
+                    tableSelect.innerHTML = '';
+                    
+                    for (const tableName in data) {
+                        const option = document.createElement('option');
+                        option.value = tableName;
+                        option.textContent = `${tableName} (${data[tableName].row_count} rows)`;
+                        tableSelect.appendChild(option);
+                    }
+                })
+                .catch(error => console.error('Error loading table information:', error));
+
+            // Handle table loading
+            document.getElementById('load-table').addEventListener('click', function() {
+                const tableName = document.getElementById('table-select').value;
+                if (!tableName) return;
+                
+                fetch(`/api/query?q=SELECT * FROM "${tableName}" LIMIT 100`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            console.error(data.error);
+                            return;
+                        }
+                        
+                        const headers = document.getElementById('table-headers');
+                        const body = document.getElementById('table-body');
+                        
+                        // Clear existing data
+                        headers.innerHTML = '';
+                        body.innerHTML = '';
+                        
+                        if (data.length === 0) {
+                            body.innerHTML = '<tr><td colspan="100%">No data available</td></tr>';
+                            return;
+                        }
+                        
+                        // Add headers
+                        const columns = Object.keys(data[0]);
+                        columns.forEach(column => {
+                            const th = document.createElement('th');
+                            th.textContent = column;
+                            headers.appendChild(th);
+                        });
+                        
+                        // Add rows
+                        data.forEach(row => {
+                            const tr = document.createElement('tr');
+                            columns.forEach(column => {
+                                const td = document.createElement('td');
+                                td.textContent = row[column] !== null ? row[column] : '';
+                                tr.appendChild(td);
+                            });
+                            body.appendChild(tr);
+                        });
+                    })
+                    .catch(error => console.error('Error loading table data:', error));
+            });
+
+            // Handle filter application
+            document.getElementById('apply-filters').addEventListener('click', function() {
+                const indicator = document.getElementById('indicator-filter').value;
+                const area = document.getElementById('area-filter').value;
+                
+                // Build query based on filters
+                let query = 'SELECT "Year Id" as Year, SUM(Value) as Production FROM Agricultural_Production_Data';
+                const conditions = [];
+                
+                if (indicator) {
+                    conditions.push(`"Indicator Code" = '${indicator}'`);
+                }
+                
+                if (area) {
+                    conditions.push(`AreaID = ${area}`);
+                }
+                
+                if (conditions.length > 0) {
+                    query += ' WHERE ' + conditions.join(' AND ');
+                }
+                
+                query += ' GROUP BY "Year Id" ORDER BY "Year Id"';
+                
+                // Execute query and update chart
+                fetch(`/api/query?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            console.error(data.error);
+                            return;
+                        }
+                        
+                        // Update yearly chart with filtered data
+                        yearlyChart.data.labels = data.map(row => row.Year);
+                        yearlyChart.data.datasets[0].data = data.map(row => row.Production);
+                        yearlyChart.update();
+                    })
+                    .catch(error => console.error('Error applying filters:', error));
+            });
+        });
+    </script>
+</body>
+</html> 

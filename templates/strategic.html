@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strategic Agricultural Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/strategic.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Agricultural Dashboard</h2>
+        <ul>
+            <li><a href="/">Analytical Dashboard</a></li>
+            <li><a href="/strategic" class="active">Strategic Dashboard</a></li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h1>Strategic Agricultural Dashboard</h1>
+            <p>Long-term trends and high-level metrics for strategic decision making</p>
+            <div class="time-period">
+                <span>Data period: {{ year_range.min }} - {{ year_range.max }}</span>
+            </div>
+        </div>
+
+        <!-- KPI Summary -->
+        <div class="kpi-container">
+            <div class="kpi-card">
+                <h3>Total Production</h3>
+                <div class="kpi-value">{{ kpi_data.total_production }}</div>
+                <div class="kpi-description">Total agricultural production value</div>
+            </div>
+            <div class="kpi-card">
+                <h3>Avg. Annual Growth</h3>
+                <div class="kpi-value">{{ kpi_data.avg_growth_rate }}%</div>
+                <div class="kpi-description">Average annual growth rate</div>
+            </div>
+            <div class="kpi-card">
+                <h3>Top 5 Concentration</h3>
+                <div class="kpi-value">{{ kpi_data.top5_concentration }}%</div>
+                <div class="kpi-description">% of production in top 5 areas</div>
+            </div>
+            <div class="kpi-card">
+                <h3>Diversity Index</h3>
+                <div class="kpi-value">{{ kpi_data.diversity_index }}</div>
+                <div class="kpi-description">Number of unique agricultural items</div>
+            </div>
+        </div>
+
+        <!-- Long-term Trend Analysis -->
+        <div class="chart-row">
+            <div class="chart-card wide-card">
+                <h3>Long-term Production Trend with Forecast</h3>
+                <div class="chart-description">
+                    Historical production trend with 5-year forecast based on historical growth patterns
+                </div>
+                <canvas id="trendForecastChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Growth Rate Analysis -->
+        <div class="chart-row">
+            <div class="chart-card">
+                <h3>Year-over-Year Growth Rates</h3>
+                <div class="chart-description">
+                    Annual growth rates showing the percentage change in production
+                </div>
+                <canvas id="growthRateChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Regional Production Distribution</h3>
+                <div class="chart-description">
+                    Production distribution across European regions
+                </div>
+                <canvas id="regionalDistributionChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Category Analysis -->
+        <div class="chart-row">
+            <div class="chart-card">
+                <h3>Production by Category</h3>
+                <div class="chart-description">
+                    Production distribution across agricultural categories
+                </div>
+                <canvas id="categoryChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Top 10 Agricultural Items</h3>
+                <div class="chart-description">
+                    Highest-producing agricultural items
+                </div>
+                <canvas id="topItemsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Regional Trends -->
+        <div class="chart-row">
+            <div class="chart-card wide-card">
+                <h3>Regional Production Trends Over Time</h3>
+                <div class="chart-description">
+                    Comparative analysis of production trends across regions
+                </div>
+                <canvas id="regionalTrendsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Strategic Insights -->
+        <div class="insights-container">
+            <h3>Strategic Insights</h3>
+            <div class="insights-list">
+                <div class="insight-item">
+                    <h4>Production Concentration</h4>
+                    <p id="concentrationInsight">Loading insights...</p>
+                </div>
+                <div class="insight-item">
+                    <h4>Growth Trajectory</h4>
+                    <p id="growthInsight">Loading insights...</p>
+                </div>
+                <div class="insight-item">
+                    <h4>Regional Performance</h4>
+                    <p id="regionalInsight">Loading insights...</p>
+                </div>
+                <div class="insight-item">
+                    <h4>Category Diversification</h4>
+                    <p id="diversificationInsight">Loading insights...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // Process data for charts
+            const trendData = JSON.parse('{{ trend_data|tojson }}');
+            const regionData = JSON.parse('{{ region_data|tojson }}');
+            const itemData = JSON.parse('{{ item_data|tojson }}');
+            const kpiData = JSON.parse('{{ kpi_data|tojson }}');
+            const categoryData = JSON.parse('{{ category_data|tojson }}');
+            
+            // Initialize charts
+            initTrendChart();
+            initGrowthRateChart();
+            initRegionalDistributionChart();
+            initCategoryChart();
+            initTopItemsChart();
+            
+            // Fetch additional data for dynamic charts
+            fetchStrategicData();
+            
+            // Generate strategic insights
+            generateInsights();
+        });
+        
+        function initTrendChart() {
+            const trendData = JSON.parse('{{ trend_data|tojson }}');
+            const ctx = document.getElementById('trendForecastChart').getContext('2d');
+            
+            // Fetch forecast data
+            fetch('/api/strategic_data')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.trend) {
+                        const allYears = [...data.trend.years, ...data.trend.forecast_years];
+                        const historicalValues = data.trend.production;
+                        const forecastValues = data.trend.forecast_values;
+                        
+                        // Create array with historical values and null for forecast periods
+                        const historicalDataset = [...historicalValues, ...Array(forecastValues.length).fill(null)];
+                        
+                        // Create array with null for historical periods and forecast values
+                        const forecastDataset = [...Array(historicalValues.length).fill(null), ...forecastValues];
+                        
+                        // Create array with moving average and null for forecast periods
+                        const movingAvgDataset = [...data.trend.moving_avg, ...Array(forecastValues.length).fill(null)];
+                        
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: allYears,
+                                datasets: [
+                                    {
+                                        label: 'Historical Production',
+                                        data: historicalDataset,
+                                        borderColor: 'rgba(75, 192, 192, 1)',
+                                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                        fill: true
+                                    },
+                                    {
+                                        label: '3-Year Moving Average',
+                                        data: movingAvgDataset,
+                                        borderColor: 'rgba(153, 102, 255, 1)',
+                                        borderWidth: 2,
+                                        pointRadius: 0,
+                                        fill: false
+                                    },
+                                    {
+                                        label: '5-Year Forecast',
+                                        data: forecastDataset,
+                                        borderColor: 'rgba(255, 99, 132, 1)',
+                                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                        borderDash: [5, 5],
+                                        fill: true
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: {
+                                        position: 'top',
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                const label = context.dataset.label || '';
+                                                const value = context.raw || 0;
+                                                return label + ': ' + value;
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: false,
+                                        title: {
+                                            display: true,
+                                            text: 'Production Value'
+                                        }
+                                    },
+                                    x: {
+                                        title: {
+                                            display: true,
+                                            text: 'Year'
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    } else {
+                        initBasicTrendChart();
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching strategic data:", error);
+                    initBasicTrendChart();
+                });
+        }
+        
+        function initBasicTrendChart() {
+            const trendData = JSON.parse('{{ trend_data|tojson }}');
+            const ctx = document.getElementById('trendForecastChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: trendData.years,
+                    datasets: [{
+                        label: 'Production Value',
+                        data: trendData.production,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        fill: true
+                    },
+                    {
+                        label: '3-Year Moving Average',
+                        data: trendData.moving_avg,
+                        borderColor: 'rgba(153, 102, 255, 1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Production Value'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Year'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function initGrowthRateChart() {
+            const trendData = JSON.parse('{{ trend_data|tojson }}');
+            const ctx = document.getElementById('growthRateChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: trendData.years,
+                    datasets: [{
+                        label: 'Growth Rate (%)',
+                        data: trendData.growth_rates,
+                        backgroundColor: trendData.growth_rates.map(rate => 
+                            rate >= 0 ? 'rgba(75, 192, 192, 0.7)' : 'rgba(255, 99, 132, 0.7)'
+                        ),
+                        borderColor: trendData.growth_rates.map(rate => 
+                            rate >= 0 ? 'rgba(75, 192, 192, 1)' : 'rgba(255, 99, 132, 1)'
+                        ),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Growth Rate (%)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Year'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function initRegionalDistributionChart() {
+            const regionData = JSON.parse('{{ region_data|tojson }}');
+            const ctx = document.getElementById('regionalDistributionChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: regionData.regions,
+                    datasets: [{
+                        label: 'Regional Distribution',
+                        data: regionData.production,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 206, 86, 0.7)',
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(153, 102, 255, 0.7)',
+                            'rgba(255, 159, 64, 0.7)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        }
+                    }
+                }
+            });
+        }
+        
+        function initCategoryChart() {
+            const categoryData = JSON.parse('{{ category_data|tojson }}');
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: categoryData.categories,
+                    datasets: [{
+                        label: 'Production by Category',
+                        data: categoryData.production,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 206, 86, 0.7)',
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(153, 102, 255, 0.7)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        }
+                    }
+                }
+            });
+        }
+        
+        function initTopItemsChart() {
+            const itemData = JSON.parse('{{ item_data|tojson }}');
+            const ctx = document.getElementById('topItemsChart').getContext('2d');
+            
+            // Limit to top 10 items
+            const items = itemData.items.slice(0, 10);
+            const production = itemData.production.slice(0, 10);
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: items,
+                    datasets: [{
+                        label: 'Production Value',
+                        data: production,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 206, 86, 0.7)',
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(153, 102, 255, 0.7)',
+                            'rgba(255, 159, 64, 0.7)',
+                            'rgba(201, 203, 207, 0.7)',
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(153, 102, 255, 0.7)',
+                            'rgba(255, 159, 64, 0.7)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    }
+                }
+            });
+        }
+        
+        function fetchStrategicData() {
+            fetch('/api/strategic_data')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.region_yearly) {
+                        initRegionalTrendsChart(data.region_yearly);
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching strategic data:", error);
+                });
+        }
+        
+        function initRegionalTrendsChart(regionYearlyData) {
+            const ctx = document.getElementById('regionalTrendsChart').getContext('2d');
+            
+            const datasets = [];
+            const colorPalette = [
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)',
+                'rgba(255, 206, 86, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)',
+                'rgba(255, 159, 64, 1)'
+            ];
+            
+            // Create a dataset for each region
+            regionYearlyData.regions.forEach((region, index) => {
+                const regionData = [];
+                
+                // Extract data for this region from the pivoted data
+                for (let i = 0; i < regionYearlyData.data.length; i++) {
+                    regionData.push(regionYearlyData.data[i][index]);
+                }
+                
+                datasets.push({
+                    label: region,
+                    data: regionData,
+                    borderColor: colorPalette[index % colorPalette.length],
+                    backgroundColor: colorPalette[index % colorPalette.length].replace('1)', '0.2)'),
+                    fill: false
+                });
+            });
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: regionYearlyData.years,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Production Value'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Year'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function generateInsights() {
+            const trendData = JSON.parse('{{ trend_data|tojson }}');
+            const regionData = JSON.parse('{{ region_data|tojson }}');
+            const categoryData = JSON.parse('{{ category_data|tojson }}');
+            const kpiData = JSON.parse('{{ kpi_data|tojson }}');
+            
+            // Concentration insight
+            let concentrationInsight = '';
+            if (kpiData.top5_concentration > 80) {
+                concentrationInsight = 'Production is highly concentrated in the top 5 areas, representing ' + 
+                    kpiData.top5_concentration + '% of total production. This suggests high dependency on few regions.';
+            } else if (kpiData.top5_concentration > 60) {
+                concentrationInsight = 'Production has moderate concentration with ' + 
+                    kpiData.top5_concentration + '% in the top 5 areas. Consider strategies to support emerging regions.';
+            } else {
+                concentrationInsight = 'Production is well distributed across regions with only ' + 
+                    kpiData.top5_concentration + '% in the top 5 areas. This suggests resilience to regional disruptions.';
+            }
+            document.getElementById('concentrationInsight').textContent = concentrationInsight;
+            
+            // Growth insight
+            let growthInsight = '';
+            if (kpiData.avg_growth_rate > 5) {
+                growthInsight = 'Strong average growth rate of ' + kpiData.avg_growth_rate + 
+                    '% annually suggests thriving agricultural sector. Consider scaling infrastructure to support continued growth.';
+            } else if (kpiData.avg_growth_rate > 0) {
+                growthInsight = 'Modest growth rate of ' + kpiData.avg_growth_rate + 
+                    '% annually indicates stable but not rapidly expanding production. Consider innovation strategies.';
+            } else {
+                growthInsight = 'Negative growth rate of ' + kpiData.avg_growth_rate + 
+                    '% annually signals challenges in the sector. Urgent intervention may be needed to reverse trend.';
+            }
+            document.getElementById('growthInsight').textContent = growthInsight;
+            
+            // Regional insight
+            let regionalInsight = '';
+            if (regionData.regions.length > 0) {
+                const topRegion = regionData.regions[0];
+                const topRegionShare = (regionData.production[0] / regionData.production.reduce((a, b) => a + b, 0) * 100).toFixed(1);
+                regionalInsight = topRegion + ' is the leading region, representing ' + topRegionShare + 
+                    '% of total production. Strategic focus on supporting this region while developing others is recommended.';
+            } else {
+                regionalInsight = 'Regional data is limited. Consider enhancing regional data collection for better strategic insights.';
+            }
+            document.getElementById('regionalInsight').textContent = regionalInsight;
+            
+            // Diversification insight
+            let diversificationInsight = '';
+            if (categoryData.categories.length > 3) {
+                const topCategory = categoryData.categories[0];
+                const topCategoryShare = (categoryData.production[0] / categoryData.production.reduce((a, b) => a + b, 0) * 100).toFixed(1);
+                diversificationInsight = 'Production is diversified across ' + categoryData.categories.length + 
+                    ' categories, with ' + topCategory + ' leading at ' + topCategoryShare + 
+                    '% of total production. This provides resilience against category-specific disruptions.';
+            } else if (categoryData.categories.length > 0) {
+                diversificationInsight = 'Limited diversification with only ' + categoryData.categories.length + 
+                    ' categories. Consider strategies to expand into new agricultural categories to reduce risk.';
+            } else {
+                diversificationInsight = 'Category data is limited. Consider enhancing categorization of agricultural items.';
+            }
+            document.getElementById('diversificationInsight').textContent = diversificationInsight;
+        }
+    </script>
+</body>
+</html> 

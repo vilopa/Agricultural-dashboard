@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agricultural Production Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Agricultural Dashboard</h2>
+        <ul>
+            <li><a href="#" class="active">Overview</a></li>
+            <li><a href="#" id="tableExplorerLink">Table Explorer</a></li>
+            <li><a href="#" id="areaAnalysisLink">Regional Analysis</a></li>
+            <li><a href="#" id="indicatorAnalysisLink">Indicators</a></li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <!-- Overview Dashboard -->
+        <div id="overviewSection" class="dashboard-section active">
+            <div class="header">
+                <h1>Agricultural Production Dashboard</h1>
+                <p>Overview of global agricultural production data</p>
+            </div>
+
+            <div class="top-stats">
+                <div class="stat-card">
+                    <h3>Total Records</h3>
+                    <p id="recordCount">{{ record_count }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Production Value</h3>
+                    <p id="totalValue">{{ total_value }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Time Period</h3>
+                    <p id="timePeriod">
+                        {% if years %}
+                            {{ years[0] }} - {{ years[-1] }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <div class="charts-container">
+                <div class="chart-card">
+                    <h3>Yearly Production Trends</h3>
+                    <canvas id="yearlyProductionChart"></canvas>
+                </div>
+                
+                <div class="chart-card">
+                    <h3>Top Areas by Production</h3>
+                    <canvas id="topAreasChart"></canvas>
+                </div>
+                
+                <div class="chart-card">
+                    <h3>Indicator Distribution</h3>
+                    <canvas id="indicatorChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Table Explorer Section -->
+        <div id="tableExplorerSection" class="dashboard-section">
+            <div class="header">
+                <h1>Database Table Explorer</h1>
+                <p>Explore tables in the agricultural database</p>
+            </div>
+            
+            <div class="db-explorer">
+                <div class="table-selector">
+                    <h3>Tables</h3>
+                    <div id="tableList" class="list-container"></div>
+                </div>
+                
+                <div class="table-view">
+                    <h3 id="selectedTableName">Select a table</h3>
+                    <div class="table-info">
+                        <p id="tableInfo"></p>
+                    </div>
+                    <div class="table-data">
+                        <div id="tableData" class="data-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Regional Analysis Section -->
+        <div id="areaAnalysisSection" class="dashboard-section">
+            <div class="header">
+                <h1>Regional Analysis</h1>
+                <p>Compare production data across different regions</p>
+            </div>
+            
+            <div class="filters">
+                <div class="filter-group">
+                    <label for="areaSelect">Select Area:</label>
+                    <select id="areaSelect">
+                        <option value="">-- Select Area --</option>
+                        {% for area in areas %}
+                        <option value="{{ area.AreaID }}">{{ area.Area }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="area-details">
+                <div id="areaDetails" class="detail-card"></div>
+            </div>
+            
+            <div class="charts-container">
+                <div class="chart-card">
+                    <h3>Production Trends by Year</h3>
+                    <canvas id="areaYearlyChart"></canvas>
+                </div>
+                
+                <div class="chart-card">
+                    <h3>Production by Item</h3>
+                    <canvas id="areaItemChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Indicator Analysis Section -->
+        <div id="indicatorAnalysisSection" class="dashboard-section">
+            <div class="header">
+                <h1>Indicator Analysis</h1>
+                <p>Analyze different production indicators</p>
+            </div>
+            
+            <div class="filters">
+                <div class="filter-group">
+                    <label for="indicatorSelect">Select Indicator:</label>
+                    <select id="indicatorSelect">
+                        <option value="">-- Select Indicator --</option>
+                        {% for indicator in indicators %}
+                        <option value="{{ indicator['Indicator Code'] }}">{{ indicator.Indicator }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="indicator-details">
+                <div id="indicatorDetails" class="detail-card"></div>
+            </div>
+            
+            <div class="charts-container">
+                <div class="chart-card">
+                    <h3>Top Areas for Selected Indicator</h3>
+                    <canvas id="indicatorAreasChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let globalData = {};
+        
+        // DOM elements
+        const navLinks = document.querySelectorAll('.sidebar ul li a');
+        const dashboardSections = document.querySelectorAll('.dashboard-section');
+        
+        // Navigation
+        navLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Remove active class from all links
+                navLinks.forEach(l => l.classList.remove('active'));
+                // Add active class to clicked link
+                this.classList.add('active');
+                
+                // Hide all sections
+                dashboardSections.forEach(section => section.classList.remove('active'));
+                
+                // Show corresponding section
+                let sectionId;
+                switch(this.id) {
+                    case 'tableExplorerLink':
+                        sectionId = 'tableExplorerSection';
+                        loadTableList();
+                        break;
+                    case 'areaAnalysisLink':
+                        sectionId = 'areaAnalysisSection';
+                        break;
+                    case 'indicatorAnalysisLink':
+                        sectionId = 'indicatorAnalysisSection';
+                        break;
+                    default:
+                        sectionId = 'overviewSection';
+                }
+                
+                document.getElementById(sectionId).classList.add('active');
+            });
+        });
+        
+        document.addEventListener("DOMContentLoaded", function() {
+            // Overview Dashboard Charts
+            initOverviewCharts();
+            
+            // Setup event listeners
+            document.getElementById('areaSelect').addEventListener('change', loadAreaData);
+            document.getElementById('indicatorSelect').addEventListener('change', loadIndicatorData);
+            
+            // Table Explorer
+            document.getElementById('tableExplorerLink').addEventListener('click', loadTableList);
+        });
+        
+        function initOverviewCharts() {
+            // Create yearly production chart
+            const yearlyCtx = document.getElementById('yearlyProductionChart').getContext('2d');
+            const yearlyChart = new Chart(yearlyCtx, {
+                type: 'line',
+                data: {
+                    labels: JSON.parse('{{ years|tojson }}'),
+                    datasets: [{
+                        label: 'Production Value',
+                        data: JSON.parse('{{ production_values|tojson }}'),
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Yearly Production Trends'
+                        }
+                    }
+                }
+            });
+
+            // Fetch additional data for the dashboard
+            fetch('/api/dashboard_data')
+                .then(response => response.json())
+                .then(data => {
+                    globalData = data;
+                    
+                    // Create top areas chart if data is available
+                    if (data.top_areas) {
+                        const areasCtx = document.getElementById('topAreasChart').getContext('2d');
+                        const areasChart = new Chart(areasCtx, {
+                            type: 'bar',
+                            data: {
+                                labels: data.top_areas.labels,
+                                datasets: [{
+                                    label: 'Production by Area',
+                                    data: data.top_areas.values,
+                                    backgroundColor: [
+                                        'rgba(255, 99, 132, 0.7)',
+                                        'rgba(54, 162, 235, 0.7)',
+                                        'rgba(255, 206, 86, 0.7)',
+                                        'rgba(75, 192, 192, 0.7)',
+                                        'rgba(153, 102, 255, 0.7)'
+                                    ],
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: {
+                                        position: 'top',
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: 'Top Areas by Production'
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    
+                    // Create indicators chart if data is available
+                    if (data.indicators) {
+                        const indicatorCtx = document.getElementById('indicatorChart').getContext('2d');
+                        const indicatorChart = new Chart(indicatorCtx, {
+                            type: 'pie',
+                            data: {
+                                labels: data.indicators.labels,
+                                datasets: [{
+                                    label: 'Indicator Distribution',
+                                    data: data.indicators.values,
+                                    backgroundColor: [
+                                        'rgba(255, 99, 132, 0.7)',
+                                        'rgba(54, 162, 235, 0.7)',
+                                        'rgba(255, 206, 86, 0.7)',
+                                        'rgba(75, 192, 192, 0.7)',
+                                        'rgba(153, 102, 255, 0.7)',
+                                        'rgba(255, 159, 64, 0.7)',
+                                        'rgba(153, 102, 255, 0.7)',
+                                        'rgba(201, 203, 207, 0.7)'
+                                    ],
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: {
+                                        position: 'right',
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: 'Indicator Distribution'
+                                    }
+                                }
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching data: ", error);
+                });
+        }
+        
+        // Table Explorer functions
+        function loadTableList() {
+            fetch('/api/tables')
+                .then(response => response.json())
+                .then(data => {
+                    const tableList = document.getElementById('tableList');
+                    tableList.innerHTML = '';
+                    
+                    Object.keys(data).forEach(tableName => {
+                        const tableInfo = data[tableName];
+                        const tableItem = document.createElement('div');
+                        tableItem.className = 'list-item';
+                        tableItem.textContent = `${tableName} (${tableInfo.row_count} rows)`;
+                        tableItem.addEventListener('click', () => showTableDetails(tableName, data[tableName]));
+                        tableList.appendChild(tableItem);
+                    });
+                })
+                .catch(error => {
+                    console.error("Error loading tables: ", error);
+                });
+        }
+        
+        function showTableDetails(tableName, tableInfo) {
+            document.getElementById('selectedTableName').textContent = tableName;
+            document.getElementById('tableInfo').textContent = 
+                `${tableInfo.row_count} rows, ${tableInfo.columns.length} columns`;
+                
+            // Create a table to show the first few rows
+            const tableData = document.getElementById('tableData');
+            tableData.innerHTML = '<p>Loading sample data...</p>';
+            
+            // Create a sample query to get the first 10 rows
+            const query = `SELECT * FROM "${tableName}" LIMIT 10`;
+            fetch(`/api/query?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        tableData.innerHTML = '<p>No data available</p>';
+                        return;
+                    }
+                    
+                    // Create table
+                    const table = document.createElement('table');
+                    table.className = 'data-table';
+                    
+                    // Create header row
+                    const thead = document.createElement('thead');
+                    const headerRow = document.createElement('tr');
+                    
+                    for (const column of tableInfo.columns) {
+                        const th = document.createElement('th');
+                        th.textContent = column.name;
+                        headerRow.appendChild(th);
+                    }
+                    
+                    thead.appendChild(headerRow);
+                    table.appendChild(thead);
+                    
+                    // Create body rows
+                    const tbody = document.createElement('tbody');
+                    
+                    for (const row of data) {
+                        const tr = document.createElement('tr');
+                        
+                        for (const column of tableInfo.columns) {
+                            const td = document.createElement('td');
+                            td.textContent = row[column.name] !== null ? row[column.name] : 'NULL';
+                            tr.appendChild(td);
+                        }
+                        
+                        tbody.appendChild(tr);
+                    }
+                    
+                    table.appendChild(tbody);
+                    tableData.innerHTML = '';
+                    tableData.appendChild(table);
+                })
+                .catch(error => {
+                    console.error("Error loading table data: ", error);
+                    tableData.innerHTML = `<p>Error loading data: ${error.message}</p>`;
+                });
+        }
+        
+        // Area Analysis functions
+        function loadAreaData() {
+            const areaId = document.getElementById('areaSelect').value;
+            if (!areaId) return;
+            
+            fetch(`/api/data_by_area/${areaId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        document.getElementById('areaDetails').innerHTML = '<p>No data available for this area</p>';
+                        return;
+                    }
+                    
+                    // Process data for visualization
+                    const yearlyData = {};
+                    const itemData = {};
+                    
+                    data.forEach(row => {
+                        // Group by year
+                        if (!yearlyData[row.YearDate]) {
+                            yearlyData[row.YearDate] = 0;
+                        }
+                        yearlyData[row.YearDate] += row.Value;
+                        
+                        // Group by item
+                        if (!itemData[row.Item]) {
+                            itemData[row.Item] = 0;
+                        }
+                        itemData[row.Item] += row.Value;
+                    });
+                    
+                    // Create area yearly chart
+                    createAreaYearlyChart(yearlyData);
+                    
+                    // Create area item chart
+                    createAreaItemChart(itemData);
+                    
+                    // Show area details
+                    document.getElementById('areaDetails').innerHTML = `
+                        <h3>${data[0].Area}</h3>
+                        <p>Total Production: ${data.reduce((sum, row) => sum + row.Value, 0).toFixed(2)}</p>
+                        <p>Years: ${Object.keys(yearlyData).length}</p>
+                        <p>Items: ${Object.keys(itemData).length}</p>
+                    `;
+                })
+                .catch(error => {
+                    console.error("Error loading area data: ", error);
+                });
+        }
+        
+        function createAreaYearlyChart(yearlyData) {
+            const years = Object.keys(yearlyData).sort();
+            const values = years.map(year => yearlyData[year]);
+            
+            const ctx = document.getElementById('areaYearlyChart').getContext('2d');
+            
+            // Check if chart already exists and destroy it
+            if (window.areaYearlyChart) {
+                window.areaYearlyChart.destroy();
+            }
+            
+            window.areaYearlyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: years,
+                    datasets: [{
+                        label: 'Production Value',
+                        data: values,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Yearly Production Trends'
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createAreaItemChart(itemData) {
+            // Sort items by value
+            const sortedItems = Object.entries(itemData)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10); // Top 10 items
+                
+            const items = sortedItems.map(item => item[0]);
+            const values = sortedItems.map(item => item[1]);
+            
+            const ctx = document.getElementById('areaItemChart').getContext('2d');
+            
+            // Check if chart already exists and destroy it
+            if (window.areaItemChart) {
+                window.areaItemChart.destroy();
+            }
+            
+            window.areaItemChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: items,
+                    datasets: [{
+                        label: 'Production by Item',
+                        data: values,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 206, 86, 0.7)',
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(153, 102, 255, 0.7)',
+                            'rgba(255, 159, 64, 0.7)',
+                            'rgba(201, 203, 207, 0.7)',
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 206, 86, 0.7)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Top Items by Production'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Indicator Analysis functions
+        function loadIndicatorData() {
+            // Implementation similar to loadAreaData but for indicators
+            console.log("Loading indicator data...");
+        }
+    </script>
+</body>
+</html>
+

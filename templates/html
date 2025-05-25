@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+</head>
+<body>
+    <h1>Dashboard</h1>
+    <h2>Data Preview</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Domain Code</th>
+                <th>AreaID</th>
+                <th>Indicator Code</th>
+                <th>Item Code (CPC)</th>
+                <th>Year Id</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data.itertuples() %}
+            <tr>
+                <td>{{ row._1 }}</td>  <!-- Domain Code -->
+                <td>{{ row._2 }}</td>  <!-- AreaID -->
+                <td>{{ row._3 }}</td>  <!-- Indicator Code -->
+                <td>{{ row._4 }}</td>  <!-- Item Code (CPC) -->
+                <td>{{ row._5 }}</td>  <!-- Year Id -->
+                <td>{{ row._6 }}</td>  <!-- Value -->
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
